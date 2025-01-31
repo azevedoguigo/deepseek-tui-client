@@ -1,11 +1,94 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
+
+type DeepSeekMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type DeepSeekRequest struct {
+	Model    string            `json:"model"`
+	Messages []DeepSeekMessage `json:"messages"`
+	Stram    bool              `json:"stream"`
+}
+
+type DeepSeekResponse struct {
+	Choises []struct {
+		Message DeepSeekMessage `json:"message"`
+	} `json:"choises"`
+}
+
+var (
+	apiKey  = os.Getenv("DEEPSEEK_API_KEY")
+	history []DeepSeekMessage
+	loading bool
+)
+
+func sendMessageToDeepSeek(message string, chatView *tview.TextView, app *tview.Application) {
+	if apiKey == "" {
+		fmt.Fprintln(chatView, "\n[red]API key não configurada.")
+		return
+	}
+
+	loading = true
+	app.QueueUpdateDraw(func() {
+		fmt.Fprintf(chatView, "\n[blue]DeepSeek está pensando...")
+	})
+
+	history = append(history, DeepSeekMessage{Role: "user", Content: message})
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	reqBody := DeepSeekRequest{
+		Model:    "deepseek-chat",
+		Messages: history,
+		Stram:    false,
+	}
+
+	jsonBody, _ := json.Marshal(reqBody)
+	req, _ := http.NewRequest(
+		"POST",
+		"https://api.deepseek.com/v1/chat/completions",
+		bytes.NewBuffer(jsonBody),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	go func() {
+		resp, err := client.Do(req)
+		loading = false
+
+		app.QueueUpdateDraw(func() {
+			if err != nil {
+				fmt.Fprintf(chatView, "\n[red]Erro na API: %v", err)
+				return
+			}
+			defer resp.Body.Close()
+
+			var apiResp DeepSeekResponse
+			if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+				fmt.Fprintf(chatView, "\n[red]Erro ao decodificar a resposta: %v", err)
+				return
+			}
+
+			if len(apiResp.Choises) > 0 {
+				response := apiResp.Choises[0].Message.Content
+				fmt.Fprintf(chatView, "\n[white]🤖 %s", response)
+				history = append(history, DeepSeekMessage{Role: "assistant", Content: response})
+			}
+		})
+	}()
+}
 
 func main() {
 	app := tview.NewApplication()
@@ -36,12 +119,14 @@ func main() {
 		AddItem(rightPanel, 0, 1, 1, 1, 0, 0, true)
 
 	inputField.SetDoneFunc(func(key tcell.Key) {
-		if key == tcell.KeyEnter {
+		if key == tcell.KeyEnter && !loading {
 			msg := inputField.GetText()
 			if msg != "" {
 				chatView.ScrollToEnd()
 				fmt.Fprintf(chatView, "\n[white]Você: %s", msg)
 				inputField.SetText("")
+
+				go sendMessageToDeepSeek(msg, chatView, app)
 			}
 		}
 	})
