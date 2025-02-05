@@ -110,7 +110,7 @@ func main() {
 	chatList.SetBorder(true).SetTitle("Chats")
 
 	chatView := tview.NewTextView().SetDynamicColors(true)
-	chatView.SetBorder(true).SetTitle("Chat")
+	chatView.SetBorder(true).SetTitle("DeepSeek TUI")
 	chatView.SetText("[green]Bem-vindo ao DeepSeek TUI!\nSelecione um chat ou comece uma nova conversa.")
 
 	inputField := tview.NewInputField().SetLabel("Mensagem: ")
