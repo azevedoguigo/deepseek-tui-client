@@ -20,13 +20,13 @@ type DeepSeekMessage struct {
 type DeepSeekRequest struct {
 	Model    string            `json:"model"`
 	Messages []DeepSeekMessage `json:"messages"`
-	Stram    bool              `json:"stream"`
+	Stream   bool              `json:"stream"`
 }
 
 type DeepSeekResponse struct {
-	Choises []struct {
+	Choices []struct {
 		Message DeepSeekMessage `json:"message"`
-	} `json:"choises"`
+	} `json:"choices"`
 }
 
 var (
@@ -52,7 +52,7 @@ func sendMessageToDeepSeek(message string, chatView *tview.TextView, app *tview.
 	reqBody := DeepSeekRequest{
 		Model:    "deepseek-chat",
 		Messages: history,
-		Stram:    false,
+		Stream:   false,
 	}
 
 	jsonBody, _ := json.Marshal(reqBody)
@@ -81,8 +81,8 @@ func sendMessageToDeepSeek(message string, chatView *tview.TextView, app *tview.
 				return
 			}
 
-			if len(apiResp.Choises) > 0 {
-				response := apiResp.Choises[0].Message.Content
+			if len(apiResp.Choices) > 0 {
+				response := apiResp.Choices[0].Message.Content
 				fmt.Fprintf(chatView, "\n[white]🤖 %s", response)
 				history = append(history, DeepSeekMessage{Role: "assistant", Content: response})
 			}
