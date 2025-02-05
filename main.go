@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -44,6 +45,7 @@ func sendMessageToDeepSeek(message string, chatView *tview.TextView, app *tview.
 	loading = true
 	app.QueueUpdateDraw(func() {
 		fmt.Fprintf(chatView, "\n[blue]DeepSeek está pensando...")
+		chatView.ScrollToEnd()
 	})
 
 	history = append(history, DeepSeekMessage{Role: "user", Content: message})
@@ -74,6 +76,12 @@ func sendMessageToDeepSeek(message string, chatView *tview.TextView, app *tview.
 				return
 			}
 			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				fmt.Fprintf(chatView, "\n[red]Erro HTTP %d: %s", resp.StatusCode, string(body))
+				return
+			}
 
 			var apiResp DeepSeekResponse
 			if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
